@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Chat</title>
+</head>
+<body>
+    <h2>Chat Group</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button id="room-name-submit" type="submit">Create Group</button>
+    </form>
+    <script>
+        document.querySelector('#room-name-submit').onclick = function(e) {
+            window.location.pathname = '/chat/' + roomName + '/';
+        };
+        console.log(roomName)
+    </script>
+</body>
+</html>
