@@ -55,7 +55,7 @@
       <div id="contacts">
         <ul>
           {% for item in combined_list %}
-          <li class="contact">
+          <li class="contact" if item.profile_image:href="{{}}">
               <div class="wrap">
                   <span class="contact-status online"></span>
                   {% if item.profile_image %}
@@ -121,74 +121,98 @@
     var groupName = {{ group_name }};
     var username = {{ username }};
 
-    var chatSocket = new ReconnectingWebSocket(
-        'ws://' + window.location.host +
-        '/ws/chat/' + groupName + '/');
+        document.addEventListener('DOMContentLoaded', function() {
+            function connectWebSocket(groupName) {
+                chatSocket = new WebSocket(
+                    'ws://' + window.location.host + '/ws/chat/' + groupName + '/');
 
-    chatSocket.onopen = function(e) {
-      fetchMessages();
-    }
+                chatSocket.onopen = function() {
+                    console.log('WebSocket connection established.');
+                };
 
-    chatSocket.onmessage = function(e) {
-        var data = JSON.parse(e.data);
-        if (data['command'] === 'messages') {
-          for (let i=0; i<data['messages'].length; i++) {
-            createMessage(data['messages'][i]);
-          }
-        } else if (data['command'] === 'new_message'){
-          createMessage(data['message']);
+                chatSocket.onmessage = function(e) {
+                    var data = JSON.parse(e.data);
+                    if (data['command'] === 'messages') {
+                        updateChatLog(data['messages']);
+                    } else if (data['command'] === 'new_message') {
+                        createMessage(data['message']);
+                    }
+                };
+
+                chatSocket.onclose = function(e) {
+                    console.error('WebSocket connection closed unexpectedly');
+                };
+            }
+
+        var contacts = document.querySelectorAll('.contact');
+        contacts.forEach(function(contact) {
+            contact.addEventListener('click', function() {
+                var contactName = contact.querySelector('.meta p').textContent;
+                var group = contact.getAttribute('data-group');
+                if (group === 'true') {
+                    connectWebSocket(contactName);
+                } else {
+                    fetchChatHistory(contactName);
+                }
+            });
+        });
+
+        document.querySelector('#chat-message-submit').onclick = function(e) {
+            var messageInputDom = document.getElementById('chat-message-input');
+            var message = messageInputDom.value.trim();
+            if (message !== '') {
+                chatSocket.send(JSON.stringify({
+                    'command': 'new_message',
+                    'message': message,
+                    'from': username
+                }));
+                messageInputDom.value = '';
+            }
+        };
+    });
+
+        function fetchChatHistory(contactName) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === XMLHttpRequest.DONE) {
+                            if (xhr.status === 200) {
+                                var messages = JSON.parse(xhr.responseText);
+                                updateChatLog(messages);
+                            } else {
+                                console.error('Failed to fetch chat history');
+                            }
+                        }
+                    };
+                    xhr.open('GET', '/fetch_chat_history?contact=' + encodeURIComponent(contactName), true);
+                    xhr.send();
+                }
+
+        function updateChatLog(messages) {
+            var chatLog = document.querySelector('#chat-log');
+            chatLog.innerHTML = ''; 
+            messages.forEach(function(message) {
+                createMessage(message);
+            });
         }
-    };
 
-    chatSocket.onclose = function(e) {
-        console.error('Chat socket closed unexpectedly');
-    };
+        function createMessage(data) {
+            var author = data['author'];
+            var msgListTag = document.createElement('li');
+            var imgTag = document.createElement('img');
+            var pTag = document.createElement('p');
+            pTag.textContent = data.content;
 
-    document.querySelector('#chat-message-input').onkeyup = function(e) {
-        if (e.keyCode === 13) {  // enter, return
-            document.querySelector('#chat-message-submit').click();
+            if (author === username) {
+                imgTag.src = '{% if user.profile_image %}{{ user.profile_image.url }}{% else %}{% static 'img/bot.avif' %}{% endif %}';
+                msgListTag.className = 'replies';
+            } else {
+                msgListTag.className = 'sent';
+            }
+
+            msgListTag.appendChild(imgTag);
+            msgListTag.appendChild(pTag);
+            document.querySelector('#chat-log').appendChild(msgListTag);
         }
-    };
-
-    document.querySelector('#chat-message-submit').onclick = function(e) {
-        var messageInputDom = document.getElementById('chat-message-input');
-        var message = messageInputDom.value;
-        chatSocket.send(JSON.stringify({
-            'command': 'new_message',
-            'message': message,
-            'from': username
-        }));
-
-        messageInputDom.value = '';
-    };
-
-    function fetchMessages() {
-      chatSocket.send(JSON.stringify({'command': 'fetch_messages' }));
-    }
-
-    function createMessage(data) {
-      var author = data['author'];
-      var msgListTag = document.createElement('li');
-      var imgTag = document.createElement('img');
-      var pTag = document.createElement('p');
-      pTag.textContent = data.content;
-      
-      if (author === username) {
-        {% if user.profile_image %}
-            imgTag.src = '{{ user.profile_image.url }}';
-        {% else %}
-            imgTag.src = '{% static 'img/bot.avif' %}';
-        {% endif %}
-
-        msgListTag.className = 'replies';
-    } else {
-        msgListTag.className = 'sent';
-    }
-    
-      msgListTag.appendChild(imgTag);
-      msgListTag.appendChild(pTag);
-      document.querySelector('#chat-log').appendChild(msgListTag);
-    }
 
 </script>
 </body>

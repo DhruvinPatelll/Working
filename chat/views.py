@@ -28,7 +28,7 @@ def chat(request):
             form.save_m2m()
             group.members.add(request.user)
             group_name = group.name
-            return redirect('room',{'group_name':group_name}) 
+            return redirect('room') 
     else:
         initial_data = {'members': [request.user.pk]}
         form = GroupForm(initial=initial_data, creator=request.user)

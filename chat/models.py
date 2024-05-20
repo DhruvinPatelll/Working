@@ -1,6 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+
 
 CustomUser = get_user_model()
  
@@ -36,3 +40,22 @@ class Message(models.Model):
 
     def get_group_messages(cls, group_name):
         return cls.objects.filter(group__name=group_name, is_group_msg=True).order_by("timestamp")
+
+    @login_required
+    @require_GET
+    def fetch_chat_history(request,reciever):
+        sender_username = request.user.username
+        receiver_username = request.GET.get(reciever, None)
+        
+        if receiver_username:
+            messages = Message.get_user_messages(sender_username, receiver_username)
+        else:
+            group_name = request.GET.get('group', None)
+            if group_name:
+                messages = Message.get_group_messages(group_name)
+            else:
+                return JsonResponse({'error': 'Invalid request'}, status=400)
+        
+        serialized_messages = [{'author': msg.author.username, 'content': msg.content, 'timestamp': msg.timestamp} for msg in messages]
+
+        return JsonResponse({'messages': serialized_messages})
