@@ -1,8 +1,12 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from .forms import GroupForm
-from .models import Group
+from .models import Group,Message
 from django.contrib.auth import get_user_model
+from django.views.decorators.http import require_GET
+from django.http import JsonResponse
+
+
 
 CustomUser = get_user_model()
 
@@ -35,3 +39,25 @@ def chat(request):
     return render(request, 'chat/chat.html', {'form': form})
 
 
+@login_required
+@require_GET
+def fetch_chat_history(request):
+    sender = request.user
+    receiver_username = request.GET.get('receiver', None)
+    group_name = request.GET.get('group', None)
+
+    if receiver_username:
+        try:
+            receiver = CustomUser.objects.get(username=receiver_username)
+        except CustomUser.DoesNotExist:
+            return JsonResponse({'error': 'Receiver does not exist'}, status=400)
+        messages = Message.get_user_messages(sender, receiver)
+        print(messages)
+    elif group_name:
+        messages = Message.get_group_messages(group_name)
+
+    else:
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    serialized_messages = [{'author': msg.author.username, 'content': msg.content, 'timestamp': msg.timestamp} for msg in messages]
+    return JsonResponse({'messages': serialized_messages})

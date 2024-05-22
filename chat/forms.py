@@ -23,4 +23,4 @@ class GroupForm(forms.ModelForm):
 class MessageForm(forms.ModelForm):
     class Meta:
         model = Message
-        fields = ['author', 'reciever', 'is_grp_msg', 'group', 'content']
+        fields = ['author', 'receiver', 'is_grp_msg', 'group', 'content']
