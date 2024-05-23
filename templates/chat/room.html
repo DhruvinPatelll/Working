@@ -122,6 +122,7 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     var chatSocket = null;
+    var isGroupChat = false;
 
     function connectWebSocket(groupName) {
         chatSocket = new WebSocket('ws://' + window.location.host + '/ws/chat/' + groupName + '/');
@@ -160,7 +161,7 @@
 
     function updateChatLog(messages) {
         var chatLog = document.querySelector('#chat-log');
-        chatLog.innerHTML = ''; 
+        chatLog.innerHTML = '';
         messages.forEach(function(message) {
             createMessage(message);
         });
@@ -174,10 +175,10 @@
         pTag.textContent = data.content;
 
         if (author === username) {
-            imgTag.src = '{{ username.profile_image.url }}';
-            msgListTag.className = 'replies';
+            imgTag.src = '{{ username.profile_image.url }}'; // Assuming 'user' is accessible in this context
+            msgListTag.className = 'sent'; // Assign class 'sent' to messages sent by the user
         } else {
-            msgListTag.className = 'sent';
+            msgListTag.className = 'replies'; // Assign class 'replies' to messages received from others
         }
 
         msgListTag.appendChild(imgTag);
@@ -189,28 +190,38 @@
     contacts.forEach(function(contact) {
         contact.addEventListener('click', function() {
             var contactName = contact.querySelector('.meta p').textContent;
-            var isGroup = contact.getAttribute('data-group') === 'true';
-            if (isGroup) {
-                connectWebSocket(contactName);
-            } else {
-                fetchChatHistory(contactName, false);
+            isGroupChat = contact.classList.contains('group-contact');
+            fetchChatHistory(contactName, isGroupChat);
+
+            if (chatSocket !== null) {
+                chatSocket.close();
             }
+            connectWebSocket(contactName);
         });
     });
 
-    document.querySelector('#chat-message-submit').onclick = function(e) {
-        var messageInputDom = document.getElementById('chat-message-input');
-        var message = messageInputDom.value.trim();
-        if (message !== '') {
-            chatSocket.send(JSON.stringify({
-                'command': 'new_message',
-                'message': message,
-                'from': username
-            }));
-            messageInputDom.value = '';
+    var chatMessageInput = document.querySelector('#chat-message-input');
+    var chatMessageSubmit = document.querySelector('#chat-message-submit');
+
+    chatMessageSubmit.addEventListener('click', function() {
+        var message = chatMessageInput.value;
+        if (message.length === 0) return;
+
+        var data = {
+            'command': 'new_message',
+            'message': message,
+            'is_grp_msg': isGroupChat
+        };
+        if (!isGroupChat) {
+            data['receiver'] = document.querySelector('.contact.active .meta p').textContent;
+        } else {
+            data['group_name'] = document.querySelector('.contact.active .meta p').textContent;
         }
-    };
+        chatSocket.send(JSON.stringify(data));
+        chatMessageInput.value = '';
+    });
 });
+
 
 
 console.log('Fetching chat history for:', contactName);
